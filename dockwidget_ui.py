@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import processing
-from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat
+from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit
 from qgis.PyQt.uic import loadUiType
 from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtGui import QFont
@@ -14,6 +14,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         self.setupUi(self)
     
         self.btnViewADTSites.clicked.connect(self.load_adt_sites)
+        self.btnRemoveSites.clicked.connect(self.remove_selected_sites)
 
     def load_adt_sites(self):
         route_lyr = self.cmbxRouteLyr.currentLayer()
@@ -45,6 +46,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         graduated_renderer.updateClasses(intersecting_adt, QgsGraduatedSymbolRenderer.Jenks, 5)
         color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
         graduated_renderer.updateColorRamp(color_ramp)
+        graduated_renderer.setSymbolSizes(4,4)
         intersecting_adt.setRenderer(graduated_renderer)
 
         label_settings  = QgsPalLayerSettings()
@@ -61,10 +63,17 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
 
         intersecting_adt.triggerRepaint()
 
+        self.adt_sites = intersecting_adt
+
         QgsProject.instance().addMapLayer(intersecting_adt)
 
     def remove_selected_sites(self):
-        ...
+        if not self.adt_sites.getSelectedFeatures():
+            return
+
+        with edit(self.adt_sites):
+            self.adt_sites.deleteFeatures(
+                [f.id() for f in self.adt_sites.getSelectedFeatures()])
 
     def merge_selected_sites(self):
         ...
