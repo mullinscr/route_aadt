@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import numpy as np
+
 import processing
 from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry
 from qgis.PyQt.uic import loadUiType
@@ -17,6 +19,30 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         self.btnRemoveSites.clicked.connect(self.remove_selected_sites)
         self.btnMergeSites.clicked.connect(self.merge_selected_sites)
         self.btnGenerateResult.clicked.connect(self.generate_result)
+
+    def _style_layer(self, layer):
+        graduated_renderer = QgsGraduatedSymbolRenderer()
+        graduated_renderer.setClassAttribute('7 day')
+        graduated_renderer.updateClasses(layer, QgsGraduatedSymbolRenderer.Jenks, 5)
+        color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
+        graduated_renderer.updateColorRamp(color_ramp)
+        graduated_renderer.setSymbolSizes(4,4)
+        layer.setRenderer(graduated_renderer)
+
+        label_settings  = QgsPalLayerSettings()
+        text_format = QgsTextFormat()
+        text_format.setFont(QFont("Arial", 10))
+        label_settings.setFormat(text_format)
+        label_settings.fieldName = "format_number(\"7 day\", 0)"
+        label_settings.isExpression = True
+        label_settings.dist = 1
+        label_settings = QgsVectorLayerSimpleLabeling(label_settings)
+        layer.setLabelsEnabled(True)
+        layer.setLabeling(label_settings)
+
+        layer.triggerRepaint()
+
+        return layer
 
     def load_adt_sites(self):
         self.route_lyr = self.cmbxRouteLyr.currentLayer()
@@ -41,31 +67,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
             'OUTPUT':'memory:'})['OUTPUT']
 
         intersecting_adt.setName(f'ADT sites ({self.buff_dist} m buffer): {self.route_lyr.sourceName()}')
-        
-        # style layer
-        graduated_renderer = QgsGraduatedSymbolRenderer()
-        graduated_renderer.setClassAttribute('7 day')
-        graduated_renderer.updateClasses(intersecting_adt, QgsGraduatedSymbolRenderer.Jenks, 5)
-        color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
-        graduated_renderer.updateColorRamp(color_ramp)
-        graduated_renderer.setSymbolSizes(4,4)
-        intersecting_adt.setRenderer(graduated_renderer)
-
-        label_settings  = QgsPalLayerSettings()
-        text_format = QgsTextFormat()
-        text_format.setFont(QFont("Arial", 10))
-        label_settings.setFormat(text_format)
-        label_settings.fieldName = "format_number(\"7 day\", 0)"
-        label_settings.isExpression = True
-        label_settings.dist = 1
-
-        label_settings = QgsVectorLayerSimpleLabeling(label_settings)
-        intersecting_adt.setLabelsEnabled(True)
-        intersecting_adt.setLabeling(label_settings)
-
-        intersecting_adt.triggerRepaint()
-
-        self.adt_sites = intersecting_adt
+        self.adt_sites = self._style_layer(intersecting_adt)
 
         QgsProject.instance().addMapLayer(intersecting_adt)
 
@@ -76,6 +78,8 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         with edit(self.adt_sites):
             self.adt_sites.deleteFeatures(
                 [f.id() for f in self.adt_sites.getSelectedFeatures()])
+
+        self._style_layer(self.adt_sites)
 
     def merge_selected_sites(self):
         if not self.adt_sites.getSelectedFeatures():
@@ -92,6 +96,8 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
                 feat['7 day'] = total_count
                 self.adt_sites.updateFeature(feat)
     
+        self._style_layer(self.adt_sites)
+
     def generate_result(self):
         # create a total route geometry
         vertices = []
@@ -120,7 +126,6 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         r = zip(distances, adts)
         r = sorted(r, key=lambda x: x[0])
 
-        import numpy as np
         print(np.mean(adts), np.median(adts))
 
         for n in range(1, len(r) - 1):
