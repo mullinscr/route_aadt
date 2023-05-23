@@ -126,7 +126,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="pushButton_3">
+     <widget class="QPushButton" name="btnGenerateResult">
       <property name="text">
        <string>Generate ADT stats and layer</string>
       </property>
