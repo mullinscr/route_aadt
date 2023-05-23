@@ -1,9 +1,10 @@
 from pathlib import Path
 
 import processing
-from qgis.core import QgsProject
+from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat
 from qgis.PyQt.uic import loadUiType
 from qgis.PyQt.QtWidgets import QDockWidget
+from qgis.PyQt.QtGui import QFont
 
 FORM_CLASS, _ = loadUiType(Path(__file__).parent / 'dockwidget.ui')
 
@@ -37,10 +38,30 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
             'OUTPUT':'memory:'})['OUTPUT']
 
         intersecting_adt.setName(f'ADT sites ({buff_dist} m buffer): {route_lyr.sourceName()}')
-        # TODO add QML styling from file
-        QgsProject.instance().addMapLayer(intersecting_adt)
-        # TODO "select" this layer in the layer tree
+        
+        # style layer
+        graduated_renderer = QgsGraduatedSymbolRenderer()
+        graduated_renderer.setClassAttribute('7 day')
+        graduated_renderer.updateClasses(intersecting_adt, QgsGraduatedSymbolRenderer.Jenks, 5)
+        color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
+        graduated_renderer.updateColorRamp(color_ramp)
+        intersecting_adt.setRenderer(graduated_renderer)
 
+        label_settings  = QgsPalLayerSettings()
+        text_format = QgsTextFormat()
+        text_format.setFont(QFont("Arial", 10))
+        label_settings.setFormat(text_format)
+        label_settings.fieldName = "format_number(\"7 day\", 0)"
+        label_settings.isExpression = True
+        label_settings.dist = 1
+
+        label_settings = QgsVectorLayerSimpleLabeling(label_settings)
+        intersecting_adt.setLabelsEnabled(True)
+        intersecting_adt.setLabeling(label_settings)
+
+        intersecting_adt.triggerRepaint()
+
+        QgsProject.instance().addMapLayer(intersecting_adt)
 
     def remove_selected_sites(self):
         ...
