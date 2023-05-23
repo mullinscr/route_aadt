@@ -114,7 +114,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="pushButton_2">
+          <widget class="QPushButton" name="btnMergeSites">
            <property name="text">
             <string>Merge selected sites</string>
            </property>

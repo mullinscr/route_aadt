@@ -15,6 +15,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
     
         self.btnViewADTSites.clicked.connect(self.load_adt_sites)
         self.btnRemoveSites.clicked.connect(self.remove_selected_sites)
+        self.btnMergeSites.clicked.connect(self.merge_selected_sites)
         self.btnGenerateResult.clicked.connect(self.generate_result)
 
     def load_adt_sites(self):
@@ -77,7 +78,19 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
                 [f.id() for f in self.adt_sites.getSelectedFeatures()])
 
     def merge_selected_sites(self):
-        ...
+        if not self.adt_sites.getSelectedFeatures():
+            return
+        
+        # sum their 7 day count
+        total_count = 0
+        for feat in self.adt_sites.getSelectedFeatures():
+            total_count += feat['7 day']
+        
+        # update each feature with this value
+        with edit(self.adt_sites):
+            for feat in self.adt_sites.getSelectedFeatures():
+                feat['7 day'] = total_count
+                self.adt_sites.updateFeature(feat)
     
     def generate_result(self):
         # create a total route geometry
