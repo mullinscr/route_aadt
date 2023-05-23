@@ -1,0 +1,24 @@
+# Mandatory items:
+[general]
+name=Route ADT
+qgisMinimumVersion=3.0
+description=Plugin description
+version=0.1.0
+author=Callum Mullins
+email=mullinscr@gmail.com
+tracker=https://github.com/
+repository=https://github.com/
+# End of mandatory metadata
+
+# Recommended items:
+# Uncomment the following line and add your changelog:
+changelog=
+    0.1.0
+      - Initial version.
+
+# Tags are comma separated with spaces allowed
+homepage=https://github.com/
+hasProcessingProvider=no
+experimental=True
+deprecated=False
+server=False
