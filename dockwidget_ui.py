@@ -23,7 +23,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
 
     def _style_layer(self, layer, size=4):
         graduated_renderer = QgsGraduatedSymbolRenderer()
-        graduated_renderer.setClassAttribute('7 day')
+        graduated_renderer.setClassAttribute('aadt')
         graduated_renderer.updateClasses(layer, QgsGraduatedSymbolRenderer.Jenks, 5)
         color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
         graduated_renderer.updateColorRamp(color_ramp)
@@ -34,7 +34,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         text_format = QgsTextFormat()
         text_format.setFont(QFont("Arial", 10))
         label_settings.setFormat(text_format)
-        label_settings.fieldName = "format_number(\"7 day\", 0)"
+        label_settings.fieldName = "format_number(\"aadt\", 0)"
         label_settings.isExpression = True
         label_settings.dist = 1
         label_settings = QgsVectorLayerSimpleLabeling(label_settings)
@@ -91,12 +91,12 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         # sum their 7 day count
         total_count = 0
         for feat in self.adt_sites.getSelectedFeatures():
-            total_count += feat['7 day']
+            total_count += feat['aadt']
         
         # update each feature with this value
         with edit(self.adt_sites):
             for feat in self.adt_sites.getSelectedFeatures():
-                feat['7 day'] = total_count
+                feat['aadt'] = total_count
                 self.adt_sites.updateFeature(feat)
     
         self._style_layer(self.adt_sites)
@@ -131,7 +131,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         uri = "linestring?crs=epsg:27700"
         mem_layer = QgsVectorLayer(uri, f'Route ADT: {self.route_lyr.sourceName()}', "memory")
         mem_layer_dp = mem_layer.dataProvider()
-        mem_layer_dp.addAttributes([QgsField("7 day", QVariant.Int)])
+        mem_layer_dp.addAttributes([QgsField("aadt", QVariant.Int)])
         mem_layer.updateFields()
         mem_layer_dp.addFeatures(part_feats)
         route_adt = self._style_layer(mem_layer, size=1)
@@ -160,7 +160,7 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         for site in self.adt_sites.getFeatures():
             geom = site.geometry()
             # TODO transform to 27700 # not needed currently
-            adt = site['7 day']
+            adt = site['aadt']
             dist = route_geom.lineLocatePoint(geom)
             distances.append(dist)
             adts.append(adt)
