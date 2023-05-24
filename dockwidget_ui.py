@@ -1,13 +1,12 @@
 from pathlib import Path
 
-import numpy as np
-
 import processing
 from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry, QgsFeature, QgsVectorLayer, QgsPoint, QgsField, QgsMapLayerProxyModel
 from qgis.PyQt.uic import loadUiType
 from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QFont
+
 
 FORM_CLASS, _ = loadUiType(Path(__file__).parent / 'dockwidget.ui')
 
@@ -46,15 +45,15 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         layer.setLabeling(label_settings)
 
         layer.triggerRepaint()
-
-        #' TODO if feature count < classes then only do that number of classes
-
         return layer
 
     def load_adt_sites(self):
         self.route_lyr = self.cmbxRouteLyr.currentLayer()
         self.adt_lyr =  self.cmbxADTLyr.currentLayer()
         self.buff_dist = self.spbxBufferM.value()
+
+        print(self.route_lyr.sourceName())
+        print(self.adt_lyr.sourceName())
 
         buffered = processing.run("native:buffer",
             {'INPUT':self.route_lyr,
@@ -75,8 +74,8 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
 
         intersecting_adt.setName(f'ADT sites ({self.buff_dist} m buffer): {self.route_lyr.sourceName()}')
         self.adt_sites = self._style_layer(intersecting_adt)
-
-        QgsProject.instance().addMapLayer(intersecting_adt)
+        QgsProject.instance().addMapLayer(self.adt_sites)
+        self.cmbxRouteADTLyr.setLayer(self.adt_sites)
 
     def remove_selected_sites(self):
         if not self.adt_sites.getSelectedFeatures():
@@ -146,6 +145,8 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         # create a total route geometry
         vertices = []
         feats = []
+        self.adt_sites = self.cmbxRouteADTLyr.currentLayer()
+        self.route_lyr = self.cmbxRouteLyr.currentLayer()
         for feat in self.route_lyr.getFeatures():
            feats.append(feat)
         feats = sorted(feats, key=lambda x: x['fid']) # expects route builder output
