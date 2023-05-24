@@ -3,9 +3,10 @@ from pathlib import Path
 import numpy as np
 
 import processing
-from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry
+from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry, QgsFeature, QgsVectorLayer, QgsPoint, QgsField
 from qgis.PyQt.uic import loadUiType
 from qgis.PyQt.QtWidgets import QDockWidget
+from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QFont
 
 FORM_CLASS, _ = loadUiType(Path(__file__).parent / 'dockwidget.ui')
@@ -20,13 +21,13 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         self.btnMergeSites.clicked.connect(self.merge_selected_sites)
         self.btnGenerateResult.clicked.connect(self.generate_result)
 
-    def _style_layer(self, layer):
+    def _style_layer(self, layer, size=4):
         graduated_renderer = QgsGraduatedSymbolRenderer()
         graduated_renderer.setClassAttribute('7 day')
         graduated_renderer.updateClasses(layer, QgsGraduatedSymbolRenderer.Jenks, 5)
         color_ramp = QgsStyle().defaultStyle().colorRamp('Spectral')
         graduated_renderer.updateColorRamp(color_ramp)
-        graduated_renderer.setSymbolSizes(4,4)
+        graduated_renderer.setSymbolSizes(size, size)
         layer.setRenderer(graduated_renderer)
 
         label_settings  = QgsPalLayerSettings()
@@ -41,6 +42,8 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         layer.setLabeling(label_settings)
 
         layer.triggerRepaint()
+
+        #' TODO if feature count < classes then only do that number of classes
 
         return layer
 
@@ -98,6 +101,43 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
     
         self._style_layer(self.adt_sites)
 
+    def create_adt_route_layer(self, route_geom, data):
+        # take the route geom,
+        # split into separate geometries as per the distances
+        # provide each one a 7 day adt value as per adts
+        route_vertices = list(route_geom.vertices())
+        start_v = 0
+        
+        part_feats = []
+        previous_pt = None
+        
+        for dist, adt in data:
+            interpolated_point = route_geom.interpolate(dist).asPoint()
+            _, closest_seg_pt, v_after, _ = route_geom.closestSegmentWithContext(interpolated_point)
+            # collect the vertexes of the route_geom
+            if v_after == -1:
+                v_after = len(route_vertices) - 1
+            part_geom = QgsGeometry.fromPolyline(route_vertices[start_v: v_after - 1] + [QgsPoint(closest_seg_pt.x(), closest_seg_pt.y())])
+            if previous_pt:
+                part_geom.insertVertex(previous_pt.x(), previous_pt.y(), 0)
+            feat = QgsFeature()
+            feat.setGeometry(part_geom)
+            feat.setAttributes([adt])
+            part_feats.append(feat)
+            start_v = v_after
+            previous_pt = closest_seg_pt
+
+        # create lyr and add these feats to it
+        uri = "linestring?crs=epsg:27700"
+        mem_layer = QgsVectorLayer(uri, f'Route ADT: {self.route_lyr.sourceName()}', "memory")
+        mem_layer_dp = mem_layer.dataProvider()
+        mem_layer_dp.addAttributes([QgsField("7 day", QVariant.Int)])
+        mem_layer.updateFields()
+        mem_layer_dp.addFeatures(part_feats)
+        route_adt = self._style_layer(mem_layer, size=1)
+
+        QgsProject.instance().addMapLayer(route_adt)
+
     def generate_result(self):
         # create a total route geometry
         vertices = []
@@ -113,33 +153,39 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
         route_length = route_geom.length() * 2 # times 2 as drawn single dir
         distances = []
         adts = [] 
+        feat_pts = []
+        interp_dists = []
         throughput = 0
 
         for site in self.adt_sites.getFeatures():
             geom = site.geometry()
-            # transform to 27700
+            # TODO transform to 27700 # not needed currently
             adt = site['7 day']
             dist = route_geom.lineLocatePoint(geom)
             distances.append(dist)
             adts.append(adt)
+            feat_pts.append(geom.asPoint())
 
-        r = zip(distances, adts)
+        r = zip(distances, adts, feat_pts)
         r = sorted(r, key=lambda x: x[0])
 
-        print(np.mean(adts), np.median(adts))
+        # first site
+        d = (r[1][0] + r[0][0]) / 2
+        throughput += (d * 2 * r[0][1])
+        interp_dists.append((d, r[0][1]))
 
         for n in range(1, len(r) - 1):
             d_ahead = (r[n + 1][0] + r[n][0]) / 2
             d_behind = (r[n][0] + r[n - 1][0]) / 2
             d = d_ahead - d_behind
+            interp_dists.append((d_ahead, r[n][1]))
             throughput += (d * 2 * r[n][1]) # * 2 as routes are drawn single dir
-
-        # first site
-        d = (r[1][0] + r[0][0]) / 2
-        throughput += (d * 2 * r[0][1])
 
         # last site
         d = route_geom.length() - ((r[-1][0] + r[-2][0]) / 2)
         throughput += (d * 2 * r[-1][1])
+        interp_dists.append((route_geom.length(), r[-1][1]))
 
-        print(f'THROUGHPUT (km): {(throughput / 1000):,.0f}\nADT: {(throughput / route_length):,.0f}')
+        self.txtResults.setPlainText(f'THROUGHPUT (km): {(throughput / 1000):,.0f}\nSpot ADT: {(throughput / route_length):,.0f}')
+
+        self.create_adt_route_layer(route_geom, interp_dists)
