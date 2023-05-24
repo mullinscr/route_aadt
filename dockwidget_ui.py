@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 
 import processing
-from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry, QgsFeature, QgsVectorLayer, QgsPoint, QgsField
+from qgis.core import QgsProject, QgsGraduatedSymbolRenderer, QgsStyle, QgsVectorLayerSimpleLabeling, QgsPalLayerSettings, QgsTextFormat, edit, QgsGeometry, QgsFeature, QgsVectorLayer, QgsPoint, QgsField, QgsMapLayerProxyModel
 from qgis.PyQt.uic import loadUiType
 from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtCore import QVariant
@@ -15,7 +15,11 @@ class DockwidgetUI(QDockWidget, FORM_CLASS):
     def __init__(self, parent=None):
         super(DockwidgetUI, self).__init__(parent)
         self.setupUi(self)
-    
+
+        self.cmbxRouteLyr.setFilters(QgsMapLayerProxyModel.LineLayer)
+        self.cmbxADTLyr.setFilters(QgsMapLayerProxyModel.PointLayer)
+        self.cmbxRouteADTLyr.setFilters(QgsMapLayerProxyModel.PointLayer)
+
         self.btnViewADTSites.clicked.connect(self.load_adt_sites)
         self.btnRemoveSites.clicked.connect(self.remove_selected_sites)
         self.btnMergeSites.clicked.connect(self.merge_selected_sites)
